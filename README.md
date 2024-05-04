@@ -140,6 +140,4 @@ If anyone else wants to work on these things, please do, I'd love to see it.
 
 ## License
 
-This project is licensed under the EUROPEAN UNION PUBLIC LICENSE v. 1.2 (EUPL)
-
-
+This project is licensed under the Zero-Clause BSD license
