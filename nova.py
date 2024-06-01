@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 
-# Licensed under the EUPL
+# Licensed under the 0BSD
 
-import subprocess
+from subprocess import Popen
+from signal import signal, SIGINT, SIGTERM
+
 
 from usb.core import find, USBTimeoutError
 
@@ -50,6 +52,18 @@ class NovaProWireless:
     PW_GAME_SINK = "NovaGame"
     PW_CHAT_SINK = "NovaChat"
 
+    # PipeWire virtual sink processes
+    PW_LOOPBACK_GAME_PROCESS = None
+    PW_LOOPBACK_CHAT_PROCESS = None
+
+    # Keeps track of enabled features for when close() is called
+    CHATMIX_CONTROLS_ENABLED = False
+    SONAR_ICON_ENABLED = False
+    CHATMIX_ENABLED = False
+
+    # Stops processes when program exits
+    CLOSE = False
+
     # Selects correct device, and makes sure we can control it
     def __init__(self):
         self.dev = find(idVendor=self.VID, idProduct=self.PID)
@@ -62,18 +76,21 @@ class NovaProWireless:
     def _create_msgdata(self, data: tuple[int]) -> bytes:
         return bytes(data).ljust(self.MSGLEN, b"0")
 
-    # Enables chatmix
-    def enable_chatmix(self):
+    # Enables/Disables chatmix controls
+    def set_chatmix_controls(self, state: bool):
         self.dev.write(
             self.ENDPOINT_TX,
-            self._create_msgdata((self.TX, self.OPT_CHATMIX_ENABLE, 1)),
+            self._create_msgdata((self.TX, self.OPT_CHATMIX_ENABLE, int(state))),
         )
+        self.CHATMIX_CONTROLS_ENABLED = state
 
-    # Enables Sonar Icon
-    def enable_sonar_icon(self):
+    # Enables/Disables Sonar Icon
+    def set_sonar_icon(self, state: bool):
         self.dev.write(
-            self.ENDPOINT_TX, self._create_msgdata((self.TX, self.OPT_SONAR_ICON, 1))
+            self.ENDPOINT_TX,
+            self._create_msgdata((self.TX, self.OPT_SONAR_ICON, int(state))),
         )
+        self.SONAR_ICON_ENABLED = state
 
     # Sets Volume
     def set_volume(self, attenuation: int):
@@ -90,7 +107,7 @@ class NovaProWireless:
         )
 
     # Create virtual pipewire loopback sinks, and redirect them to the real headset sink
-    def _enable_virtual_sinks(self):
+    def _start_virtual_sinks(self):
         cmd = [
             "pw-loopback",
             "-P",
@@ -98,15 +115,16 @@ class NovaProWireless:
             "--capture-props=media.class=Audio/Sink",
             "-n",
         ]
-        subprocess.Popen(cmd + [self.PW_GAME_SINK])
-        subprocess.Popen(cmd + [self.PW_CHAT_SINK])
+        self.PW_LOOPBACK_GAME_PROCESS = Popen(cmd + [self.PW_GAME_SINK])
+        self.PW_LOOPBACK_CHAT_PROCESS = Popen(cmd + [self.PW_CHAT_SINK])
 
     # ChatMix implementation
     # Continuously read from base station and ignore everything but ChatMix messages (OPT_CHATMIX)
     # The .read method times out and returns an error. This error is catched and basically ignored. Timeout can be configured, but not turned off (I think).
     def chatmix(self):
-        self._enable_virtual_sinks()
-        while True:
+        self._start_virtual_sinks()
+        self.CHATMIX_ENABLED = True
+        while not self.CLOSE:
             try:
                 msg = self.dev.read(self.ENDPOINT_RX, self.MSGLEN)
                 if msg[1] != self.OPT_CHATMIX:
@@ -120,15 +138,15 @@ class NovaProWireless:
                 cmd = ["pactl", "set-sink-volume"]
 
                 # Actually change volume. Everytime you turn the dial, both volumes are set to the correct level
-                subprocess.Popen(cmd + [f"input.{self.PW_GAME_SINK}", f"{gamevol}%"])
-                subprocess.Popen(cmd + [f"input.{self.PW_CHAT_SINK}", f"{chatvol}%"])
+                Popen(cmd + [f"input.{self.PW_GAME_SINK}", f"{gamevol}%"])
+                Popen(cmd + [f"input.{self.PW_CHAT_SINK}", f"{chatvol}%"])
             # Ignore timeout.
             except USBTimeoutError:
                 continue
 
     # Prints output from base station. `debug` argument enables raw output.
     def print_output(self, debug: bool = False):
-        while True:
+        while not self.CLOSE:
             try:
                 msg = self.dev.read(self.ENDPOINT_RX, self.MSGLEN)
                 if debug:
@@ -147,10 +165,26 @@ class NovaProWireless:
             except USBTimeoutError:
                 continue
 
+    # Terminates processes and disables features
+    def close(self, signum, frame):
+        self.CLOSE = True
+        if self.CHATMIX_CONTROLS_ENABLED:
+            self.set_chatmix_controls(False)
+        if self.SONAR_ICON_ENABLED:
+            print("test")
+            self.set_sonar_icon(False)
+        if self.CHATMIX_ENABLED:
+            self.PW_LOOPBACK_GAME_PROCESS.terminate()
+            self.PW_LOOPBACK_CHAT_PROCESS.terminate()
+
 
 # When run directly, just start the ChatMix implementation. (And activate the icon, just for fun)
 if __name__ == "__main__":
     nova = NovaProWireless()
-    nova.enable_sonar_icon()
-    nova.enable_chatmix()
+    nova.set_sonar_icon(True)
+    nova.set_chatmix_controls(True)
+
+    signal(SIGINT, nova.close)
+    signal(SIGTERM, nova.close)
+
     nova.chatmix()

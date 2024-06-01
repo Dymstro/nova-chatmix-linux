@@ -78,9 +78,16 @@ For this project I created a simple Python program to both enable the controls a
 - PipeWire
 - pactl
 
-On Fedora 39 (assuming PipeWire is already setup) these can be installed with:
+On Fedora (assuming PipeWire is already setup) these can be installed with:
 ```
 sudo dnf install pulseaudio-utils python3 python3-pyusb
+```
+### Install
+
+Clone this repo and cd into it
+```
+git clone https://git.dymstro.nl/Dymstro/nova-chatmix-linux.git
+cd nova-chatmix-linux
 ```
 
 To be able to run the script as a non-root user, some udev rules need to be applied. This will allow regular users to access the base station USB device.
@@ -93,12 +100,50 @@ sudo udevadm control --reload-rules
 sudo udevadm trigger
 ```
 
+Check if your audio device matches the one on line 49 of `nova.py`
+```
+pactl list sinks short
+# The output should look something like this:
+# 47      alsa_output.pci-0000_0c_00.4.iec958-stereo      PipeWire        s32le 2ch 48000Hz       SUSPENDED
+# 77      alsa_output.pci-0000_0a_00.1.hdmi-stereo        PipeWire        s32le 2ch 48000Hz       SUSPENDED
+# 92      alsa_output.usb-SteelSeries_Arctis_Nova_Pro_Wireless-00.iec958-stereo   PipeWire        s24le 2ch 48000Hz       RUNNING
+```
+
+In `nova.py`:
+```
+## Lines 48-50
+# PW_ORIGINAL_SINK = (
+#     "alsa_output.usb-SteelSeries_Arctis_Nova_Pro_Wireless-00.7.iec958-stereo" # Edit this line if needed
+# )
+```
+
+If you want to run this script on startup you can add and enable the systemd service
+```
+## The systemd service expects the script in .local/bin
+# Create the folder if it doesn't exist
+mkdir -p ~/.local/bin
+# Copy the script to the expected location
+cp -i nova.py ~/.local/bin
+
+# Create systemd user unit folder if it doesn't exist
+mkdir -p ~/.config/systemd/user
+# Install the service file
+cp nova-chatmix.service ~/.config/systemd/user/
+# Reload systemd configuration
+systemctl --user daemon-reload
+# Enable and start the service
+systemctl --user enable nova-chatmix --now
+```
+
+### Run
+
 You can now run the python script to use ChatMix. 
 This will create 2 virtual sound devices:
 - NovaGame for game/general audio
 - NovaChat for chat audio
 
 ```
+# You do not need to run this if you installed the systemd unit!
 python nova.py
 ```
 
@@ -128,7 +173,7 @@ nova.print_output(True)
 
 ## What's Next
 
-Currently none of this is very polished, it should work, but that's about it. I would like to make this a bit more integrated, so that it just works without having to run the python script every time.
+Currently none of this is very polished, it should work, but that's about it. ~~I would like to make this a bit more integrated, so that it just works without having to run the python script every time.~~ I added a systemd service to automate starting the script.
 
 There are also some other projects that try to make headset features work on linux, for example [HeadsetControl](https://github.com/Sapd/HeadsetControl). I might want to try and get some of this implemented in there.
 
