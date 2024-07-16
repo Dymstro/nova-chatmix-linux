@@ -6,6 +6,7 @@ Wants=network-online.target
 [Service]
 Restart=no
 Type=simple
+ExecStartPre=/bin/sleep 1
 ExecStart=%h/.local/bin/nova.py 
 
 [Install]

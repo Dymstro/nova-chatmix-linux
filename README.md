@@ -90,7 +90,7 @@ git clone https://git.dymstro.nl/Dymstro/nova-chatmix-linux.git
 cd nova-chatmix-linux
 ```
 
-To be able to run the script as a non-root user, some udev rules need to be applied. This will allow regular users to access the base station USB device.
+To be able to run the script as a non-root user, some udev rules need to be applied. This will allow regular users to access the base station USB device. It also starts the script when it gets plugged in (only when the systemd service is set up).
 
 Copy `50-nova-pro-wireless.rules` to `/etc/udev/rules.d` and reload udev rules:
 ```
@@ -98,23 +98,6 @@ sudo cp 50-nova-pro-wireless.rules /etc/udev/rules.d/
 
 sudo udevadm control --reload-rules
 sudo udevadm trigger
-```
-
-Check if your audio device matches the one on line 49 of `nova.py`
-```
-pactl list sinks short
-# The output should look something like this:
-# 47      alsa_output.pci-0000_0c_00.4.iec958-stereo      PipeWire        s32le 2ch 48000Hz       SUSPENDED
-# 77      alsa_output.pci-0000_0a_00.1.hdmi-stereo        PipeWire        s32le 2ch 48000Hz       SUSPENDED
-# 92      alsa_output.usb-SteelSeries_Arctis_Nova_Pro_Wireless-00.iec958-stereo   PipeWire        s24le 2ch 48000Hz       RUNNING
-```
-
-In `nova.py`:
-```
-## Lines 48-50
-# PW_ORIGINAL_SINK = (
-#     "alsa_output.usb-SteelSeries_Arctis_Nova_Pro_Wireless-00.7.iec958-stereo" # Edit this line if needed
-# )
 ```
 
 If you want to run this script on startup you can add and enable the systemd service

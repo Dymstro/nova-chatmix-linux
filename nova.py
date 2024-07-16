@@ -2,11 +2,9 @@
 
 # Licensed under the 0BSD
 
-from subprocess import Popen
+from subprocess import Popen, check_output
 from signal import signal, SIGINT, SIGTERM
-
-
-from usb.core import find, USBTimeoutError
+from usb.core import find, USBTimeoutError, USBError
 
 
 class NovaProWireless:
@@ -43,11 +41,8 @@ class NovaProWireless:
     OPT_EQ_PRESET = 46
 
     # PipeWire Names
-    ## Name of digital sink.
-    ## PipeWire docs recommend the analog sink, but I've had better results with the digital one. Probably not actually, but whatever.
-    PW_ORIGINAL_SINK = (
-        "alsa_output.usb-SteelSeries_Arctis_Nova_Pro_Wireless-00.7.iec958-stereo"
-    )
+    ## This is automatically detected, can be set manually by overriding this variable
+    PW_ORIGINAL_SINK = None
     ## Names of virtual sound devices
     PW_GAME_SINK = "NovaGame"
     PW_CHAT_SINK = "NovaChat"
@@ -59,7 +54,6 @@ class NovaProWireless:
     # Keeps track of enabled features for when close() is called
     CHATMIX_CONTROLS_ENABLED = False
     SONAR_ICON_ENABLED = False
-    CHATMIX_ENABLED = False
 
     # Stops processes when program exits
     CLOSE = False
@@ -105,9 +99,23 @@ class NovaProWireless:
             self.ENDPOINT_TX,
             self._create_msgdata((self.TX, self.OPT_EQ_PRESET, preset)),
         )
+    
+    # Checks available sinks and select headset
+    def _detect_original_sink(self):
+        # If sink is set manually, skip auto detect
+        if self.PW_ORIGINAL_SINK:
+            return
+        sinks = check_output(["pactl", "list", "sinks", "short"]).decode().split("\n")
+        for sink in sinks:
+            print(sink)
+            name = sink.split("\t")[1]
+            if "SteelSeries_Arctis_Nova_Pro_Wireless" in name:
+                self.PW_ORIGINAL_SINK = name
+                break
 
-    # Create virtual pipewire loopback sinks, and redirect them to the real headset sink
+    # Creates virtual pipewire loopback sinks, and redirects them to the real headset sink
     def _start_virtual_sinks(self):
+        self._detect_original_sink()
         cmd = [
             "pw-loopback",
             "-P",
@@ -118,12 +126,15 @@ class NovaProWireless:
         self.PW_LOOPBACK_GAME_PROCESS = Popen(cmd + [self.PW_GAME_SINK])
         self.PW_LOOPBACK_CHAT_PROCESS = Popen(cmd + [self.PW_CHAT_SINK])
 
+    def _remove_virtual_sinks(self):
+        self.PW_LOOPBACK_GAME_PROCESS.terminate()
+        self.PW_LOOPBACK_CHAT_PROCESS.terminate()
+
     # ChatMix implementation
     # Continuously read from base station and ignore everything but ChatMix messages (OPT_CHATMIX)
     # The .read method times out and returns an error. This error is catched and basically ignored. Timeout can be configured, but not turned off (I think).
     def chatmix(self):
         self._start_virtual_sinks()
-        self.CHATMIX_ENABLED = True
         while not self.CLOSE:
             try:
                 msg = self.dev.read(self.ENDPOINT_RX, self.MSGLEN)
@@ -143,6 +154,12 @@ class NovaProWireless:
             # Ignore timeout.
             except USBTimeoutError:
                 continue
+            except USBError:
+                print("Device was probably disconnected, exiting..")
+                self.CLOSE = True
+                self._remove_virtual_sinks()
+        # Remove virtual sinks on exit
+        self._remove_virtual_sinks()
 
     # Prints output from base station. `debug` argument enables raw output.
     def print_output(self, debug: bool = False):
@@ -171,11 +188,7 @@ class NovaProWireless:
         if self.CHATMIX_CONTROLS_ENABLED:
             self.set_chatmix_controls(False)
         if self.SONAR_ICON_ENABLED:
-            print("test")
             self.set_sonar_icon(False)
-        if self.CHATMIX_ENABLED:
-            self.PW_LOOPBACK_GAME_PROCESS.terminate()
-            self.PW_LOOPBACK_CHAT_PROCESS.terminate()
 
 
 # When run directly, just start the ChatMix implementation. (And activate the icon, just for fun)
