@@ -82,6 +82,12 @@ On Fedora (assuming PipeWire is already setup) these can be installed with:
 ```
 sudo dnf install pulseaudio-utils python3 python3-pyusb
 ```
+
+On Debian based systems (like Ubuntu) these can be installed with:
+```
+sudo apt install pulseaudio-utils python3 python3-usb
+```
+
 ### Install
 
 Clone this repo and cd into it
