@@ -7,7 +7,7 @@ Wants=network-online.target
 Restart=no
 Type=simple
 ExecStartPre=/bin/sleep 1
-ExecStart=%h/.local/bin/nova.py 
+ExecStart=/usr/bin/python3 %h/.local/bin/nova.py 
 
 [Install]
 WantedBy=default.target
