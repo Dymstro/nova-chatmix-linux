@@ -6,7 +6,7 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-			lib = nixpkgs.lib;
+      lib = nixpkgs.lib;
     in {
       packages.${system} = let pkgs = nixpkgs.legacyPackages.${system};
       in {
@@ -19,10 +19,10 @@
 
           src = ./.;
 
-					postInstall = ''
-						mkdir -p $out/etc/udev/rules.d
-						cp ./50-nova-pro-wireless.rules $out/etc/udev/rules.d/
-						'';
+          postInstall = ''
+            mkdir -p $out/etc/udev/rules.d
+            cp ./50-nova-pro-wireless.rules $out/etc/udev/rules.d/
+          '';
 
           meta = {
             homepage = "https://git.dymstro.nl/Dymstro/nova-chatmix-linux";
@@ -40,7 +40,7 @@
           enable = lib.mkEnableOption "steelseries chatmix support";
         };
         config = lib.mkIf config.services.nova-chatmix.enable {
-					services.udev.packages = [self.packages.${system}.default];
+          services.udev.packages = [ self.packages.${system}.default ];
           systemd.user.services.nova-chatmix = {
             enable = true;
             after = [ "pipewire.service" "pipewire-pulse.service" ];
@@ -51,6 +51,7 @@
             serviceConfig = {
               Type = "simple";
               Restart = "always";
+              ExecStartPre = "${pkgs.coreutils-full}/bin/sleep 1";
               ExecStart = "${self.packages.${system}.default}/bin/nova.py";
             };
           };
