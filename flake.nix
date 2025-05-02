@@ -8,8 +8,7 @@
       pkgs = nixpkgs.legacyPackages.${system};
       lib = nixpkgs.lib;
     in {
-      packages.${system} = let pkgs = nixpkgs.legacyPackages.${system};
-      in {
+      packages.${system} = {
         default = pkgs.python3Packages.buildPythonApplication {
           pname = "nova-chatmix";
           version = "1.0";
@@ -51,7 +50,7 @@
             serviceConfig = {
               Type = "simple";
               Restart = "always";
-              ExecStartPre = "${pkgs.coreutils-full}/bin/sleep 1";
+              ExecStartPre = "${pkgs.coreutils-full}/bin/sleep 10";
               ExecStart = "${self.packages.${system}.default}/bin/nova.py";
             };
           };
