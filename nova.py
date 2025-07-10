@@ -2,9 +2,52 @@
 
 # Licensed under the 0BSD
 
+from signal import SIGINT, SIGTERM, signal
 from subprocess import Popen, check_output
-from signal import signal, SIGINT, SIGTERM
-from usb.core import find, USBTimeoutError, USBError
+
+from hid import device
+from hid import enumerate as hidenumerate
+
+CMD_PACTL = "pactl"
+CMD_PWLOOPBACK = "pw-loopback"
+
+
+class ChatMix:
+    # Create virtual pipewire sinks
+    def __init__(self, output_sink: str, main_sink: str, chat_sink: str):
+        self.main_sink = main_sink
+        self.chat_sink = chat_sink
+        self.main_sink_process = self._create_virtual_sink(main_sink, output_sink)
+        self.chat_sink_process = self._create_virtual_sink(chat_sink, output_sink)
+
+    def set_main_volume(self, volume: int):
+        self._set_volume(self.main_sink, volume)
+
+    def set_chat_volume(self, volume: int):
+        self._set_volume(self.chat_sink, volume)
+
+    def set_volumes(self, main_volume: int, chat_volume: int):
+        self.set_main_volume(main_volume)
+        self.set_chat_volume(chat_volume)
+
+    def close(self):
+        self.main_sink_process.terminate()
+        self.chat_sink_process.terminate()
+
+    def _create_virtual_sink(self, name: str, output_sink: str) -> Popen:
+        return Popen(
+            [
+                CMD_PWLOOPBACK,
+                "-P",
+                output_sink,
+                "--capture-props=media.class=Audio/Sink",
+                "-n",
+                name,
+            ]
+        )
+
+    def _set_volume(self, sink: str, volume: int):
+        Popen([CMD_PACTL, "set-sink-volume", f"input.{sink}", f"{volume}%"])
 
 
 class NovaProWireless:
@@ -15,11 +58,11 @@ class NovaProWireless:
     # bInterfaceNumber
     INTERFACE = 0x4
 
-    # bEndpointAddress
-    ENDPOINT_TX = 0x4  # EP 4 OUT
-    ENDPOINT_RX = 0x84  # EP 4 IN
+    # HID Message length
+    MSGLEN = 63
 
-    MSGLEN = 64  # Total USB packet is 128 bytes, data is last 64 bytes.
+    # Message read timeout
+    READ_TIMEOUT = 1000
 
     # First byte controls data direction.
     TX = 0x6  # To base station.
@@ -28,28 +71,24 @@ class NovaProWireless:
     # Second Byte
     # This is a very limited list of options, you can control way more. I just haven't implemented those options (yet)
     ## As far as I know, this only controls the icon.
-    OPT_SONAR_ICON = 141
-    ## Enabling this options enables the ability to switch between volume and ChatMix.
-    OPT_CHATMIX_ENABLE = 73
+    OPT_SONAR_ICON = 0x8D
+    ## Enabling this option enables the ability to switch between volume and ChatMix.
+    OPT_CHATMIX_ENABLE = 0x49
     ## Volume controls, 1 byte
-    OPT_VOLUME = 37
+    OPT_VOLUME = 0x25
     ## ChatMix controls, 2 bytes show and control game and chat volume.
-    OPT_CHATMIX = 69
+    OPT_CHATMIX = 0x45
     ## EQ controls, 2 bytes show and control which band and what value.
-    OPT_EQ = 49
+    OPT_EQ = 0x31
     ## EQ preset controls, 1 byte sets and shows enabled preset. Preset 4 is the custom preset required for OPT_EQ.
-    OPT_EQ_PRESET = 46
+    OPT_EQ_PRESET = 0x2E
 
     # PipeWire Names
-    ## This is automatically detected, can be set manually by overriding this variable
-    PW_ORIGINAL_SINK = None
+    ## String used to automatically select output sink
+    PW_OUTPUT_SINK_AUTODETECT = "SteelSeries_Arctis_Nova_Pro_Wireless"
     ## Names of virtual sound devices
     PW_GAME_SINK = "NovaGame"
     PW_CHAT_SINK = "NovaChat"
-
-    # PipeWire virtual sink processes
-    PW_LOOPBACK_GAME_PROCESS = None
-    PW_LOOPBACK_CHAT_PROCESS = None
 
     # Keeps track of enabled features for when close() is called
     CHATMIX_CONTROLS_ENABLED = False
@@ -58,129 +97,105 @@ class NovaProWireless:
     # Stops processes when program exits
     CLOSE = False
 
-    # Selects correct device, and makes sure we can control it
-    def __init__(self):
-        self.dev = find(idVendor=self.VID, idProduct=self.PID)
-        if self.dev is None:
-            raise ValueError("Device not found")
-        if self.dev.is_kernel_driver_active(self.INTERFACE):
-            self.dev.detach_kernel_driver(self.INTERFACE)
+    # Device not found error string
+    ERR_NOTFOUND = "Device not found"
 
-    # Takes a tuple of ints and turns it into bytes with the correct length padded with zeroes
-    def _create_msgdata(self, data: tuple[int]) -> bytes:
-        return bytes(data).ljust(self.MSGLEN, b"0")
+    # Selects correct device, and makes sure we can control it
+    def __init__(self, output_sink=None):
+        # Find HID device path
+        devpath = None
+        for hiddev in hidenumerate(self.VID, self.PID):
+            if hiddev["interface_number"] == self.INTERFACE:
+                devpath = hiddev["path"]
+                break
+        if not devpath:
+            raise DeviceNotFoundException
+
+        # Try to automatically detect output sink, this is skipped if output_sink is given
+        if not output_sink:
+            sinks = (
+                check_output([CMD_PACTL, "list", "sinks", "short"]).decode().split("\n")
+            )
+            for sink in sinks[:-1]:
+                sink_name = sink.split("\t")[1]
+                if self.PW_OUTPUT_SINK_AUTODETECT in sink_name:
+                    output_sink = sink_name
+
+        self.dev = device()
+        self.dev.open_path(devpath)
+        self.dev.set_nonblocking(True)
+        self.output_sink = output_sink
 
     # Enables/Disables chatmix controls
     def set_chatmix_controls(self, state: bool):
+        assert self.dev, self.ERR_NOTFOUND
         self.dev.write(
-            self.ENDPOINT_TX,
             self._create_msgdata((self.TX, self.OPT_CHATMIX_ENABLE, int(state))),
         )
         self.CHATMIX_CONTROLS_ENABLED = state
 
     # Enables/Disables Sonar Icon
     def set_sonar_icon(self, state: bool):
+        assert self.dev, self.ERR_NOTFOUND
         self.dev.write(
-            self.ENDPOINT_TX,
             self._create_msgdata((self.TX, self.OPT_SONAR_ICON, int(state))),
         )
         self.SONAR_ICON_ENABLED = state
 
     # Sets Volume
     def set_volume(self, attenuation: int):
+        assert self.dev, self.ERR_NOTFOUND
         self.dev.write(
-            self.ENDPOINT_TX,
             self._create_msgdata((self.TX, self.OPT_VOLUME, attenuation)),
         )
 
     # Sets EQ preset
     def set_eq_preset(self, preset: int):
+        assert self.dev, self.ERR_NOTFOUND
         self.dev.write(
-            self.ENDPOINT_TX,
             self._create_msgdata((self.TX, self.OPT_EQ_PRESET, preset)),
         )
-    
-    # Checks available sinks and select headset
-    def _detect_original_sink(self):
-        # If sink is set manually, skip auto detect
-        if self.PW_ORIGINAL_SINK:
-            return
-        sinks = check_output(["pactl", "list", "sinks", "short"]).decode().split("\n")
-        for sink in sinks:
-            print(sink)
-            name = sink.split("\t")[1]
-            if "SteelSeries_Arctis_Nova_Pro_Wireless" in name:
-                self.PW_ORIGINAL_SINK = name
-                break
-
-    # Creates virtual pipewire loopback sinks, and redirects them to the real headset sink
-    def _start_virtual_sinks(self):
-        self._detect_original_sink()
-        cmd = [
-            "pw-loopback",
-            "-P",
-            self.PW_ORIGINAL_SINK,
-            "--capture-props=media.class=Audio/Sink",
-            "-n",
-        ]
-        self.PW_LOOPBACK_GAME_PROCESS = Popen(cmd + [self.PW_GAME_SINK])
-        self.PW_LOOPBACK_CHAT_PROCESS = Popen(cmd + [self.PW_CHAT_SINK])
-
-    def _remove_virtual_sinks(self):
-        self.PW_LOOPBACK_GAME_PROCESS.terminate()
-        self.PW_LOOPBACK_CHAT_PROCESS.terminate()
 
     # ChatMix implementation
     # Continuously read from base station and ignore everything but ChatMix messages (OPT_CHATMIX)
-    # The .read method times out and returns an error. This error is catched and basically ignored. Timeout can be configured, but not turned off (I think).
-    def chatmix(self):
-        self._start_virtual_sinks()
+    def chatmix_volume_control(self, chatmix: ChatMix):
+        assert self.dev, self.ERR_NOTFOUND
         while not self.CLOSE:
             try:
-                msg = self.dev.read(self.ENDPOINT_RX, self.MSGLEN)
-                if msg[1] != self.OPT_CHATMIX:
+                msg = self.dev.read(self.MSGLEN, self.READ_TIMEOUT)
+                if not msg or msg[1] is not self.OPT_CHATMIX:
                     continue
 
                 # 4th and 5th byte contain ChatMix data
                 gamevol = msg[2]
                 chatvol = msg[3]
 
-                # Set Volume using PulseAudio tools. Can be done with pure pipewire tools, but I didn't feel like it
-                cmd = ["pactl", "set-sink-volume"]
-
                 # Actually change volume. Everytime you turn the dial, both volumes are set to the correct level
-                Popen(cmd + [f"input.{self.PW_GAME_SINK}", f"{gamevol}%"])
-                Popen(cmd + [f"input.{self.PW_CHAT_SINK}", f"{chatvol}%"])
-            # Ignore timeout.
-            except USBTimeoutError:
-                continue
-            except USBError:
-                print("Device was probably disconnected, exiting..")
+                chatmix.set_volumes(gamevol, chatvol)
+            except OSError:
+                print("Device was probably disconnected, exiting.")
                 self.CLOSE = True
-                self._remove_virtual_sinks()
         # Remove virtual sinks on exit
-        self._remove_virtual_sinks()
+        chatmix.close()
 
     # Prints output from base station. `debug` argument enables raw output.
     def print_output(self, debug: bool = False):
+        assert self.dev
         while not self.CLOSE:
-            try:
-                msg = self.dev.read(self.ENDPOINT_RX, self.MSGLEN)
-                if debug:
-                    print(msg)
-                match msg[1]:
-                    case self.OPT_VOLUME:
-                        print(f"Volume: -{msg[2]}")
-                    case self.OPT_CHATMIX:
-                        print(f"Game Volume: {msg[2]} - Chat Volume: {msg[3]}")
-                    case self.OPT_EQ:
-                        print(f"EQ: Bar: {msg[2]} - Value: {(msg[3] - 20) / 2}")
-                    case self.OPT_EQ_PRESET:
-                        print(f"EQ Preset: {msg[2]}")
-                    case _:
-                        print("Unknown Message")
-            except USBTimeoutError:
-                continue
+            msg = self.dev.read(self.MSGLEN, self.READ_TIMEOUT)
+            if debug:
+                print(msg)
+            match msg[1]:
+                case self.OPT_VOLUME:
+                    print(f"Volume: -{msg[2]}")
+                case self.OPT_CHATMIX:
+                    print(f"Game Volume: {msg[2]} - Chat Volume: {msg[3]}")
+                case self.OPT_EQ:
+                    print(f"EQ: Bar: {msg[2]} - Value: {(msg[3] - 20) / 2}")
+                case self.OPT_EQ_PRESET:
+                    print(f"EQ Preset: {msg[2]}")
+                case _:
+                    print("Unknown Message")
 
     # Terminates processes and disables features
     def close(self, signum, frame):
@@ -190,14 +205,32 @@ class NovaProWireless:
         if self.SONAR_ICON_ENABLED:
             self.set_sonar_icon(False)
 
+    # Takes a tuple of ints and turns it into bytes with the correct length padded with zeroes
+    def _create_msgdata(self, data: tuple[int, ...]) -> bytes:
+        return bytes(data).ljust(self.MSGLEN, b"\0")
+
+
+class DeviceNotFoundException(Exception):
+    pass
+
 
 # When run directly, just start the ChatMix implementation. (And activate the icon, just for fun)
 if __name__ == "__main__":
-    nova = NovaProWireless()
-    nova.set_sonar_icon(True)
-    nova.set_chatmix_controls(True)
+    try:
+        nova = NovaProWireless()
+        nova.set_sonar_icon(state=True)
+        nova.set_chatmix_controls(state=True)
 
-    signal(SIGINT, nova.close)
-    signal(SIGTERM, nova.close)
+        signal(SIGINT, nova.close)
+        signal(SIGTERM, nova.close)
 
-    nova.chatmix()
+        assert nova.output_sink, "Output sink not set"
+        chatmix = ChatMix(
+            output_sink=nova.output_sink,
+            main_sink=nova.PW_GAME_SINK,
+            chat_sink=nova.PW_CHAT_SINK,
+        )
+
+        nova.chatmix_volume_control(chatmix=chatmix)
+    except DeviceNotFoundException:
+        print("Device not found, exiting.")
