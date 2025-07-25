@@ -1,6 +1,6 @@
-# Arctis Nova Pro Wireless ChatMix on Linux
+# Nova ChatMix For Linux
 
-## About this project
+## About
 
 Some SteelSeries headsets have a feature called ChatMix where you can easily adjust game and chat audio volume on the headphones or dongle.
 
@@ -12,44 +12,67 @@ Sonar of course only works on Windows and requires a SteelSeries account.
 
 Even though it is now a software feature, the hardware can still control it, but only when Sonar activated this feature on the base station. You can toggle between normal volume controls and ChatMix by pressing down on the volume dial on either the headset or base station.
 
-I wanted to be able to use ChatMix on linux, so I reverse engineered the communication between Sonar and the base station to control 2 virtual PipeWire sinks.
+I wanted to be able to use ChatMix on Linux, so I reverse engineered the communication between Sonar and the base station to control 2 virtual PipeWire sinks.
 
 ## Disclaimer
 
-THIS PROJECT HAS NO ASSOCIATION TO STEELSERIES, NOR IS IT IN ANY WAY SUPPORTED BY THEM.
+THIS PROJECT HAS NO ASSOCIATION TO STEELSERIES, NOR IS IT IN ANY WAY SUPPORTED BY THEM.   
+I AM NOT RESPONSIBLE FOR BRICKED/BROKEN DEVICES NOR DO I GUARANTEE IT WILL WORK FOR YOU.   
+USING ANYTHING IN THIS PROJECT _MIGHT_ VOID YOUR WARRANTY AND IS AT YOUR OWN RISK.   
 
-I AM NOT RESPONSIBLE FOR BRICKED/BROKEN DEVICES NOR DO I GUARANTEE IT WILL WORK FOR YOU.
 
-USING ANYTHING IN THIS PROJECT _MIGHT_ VOID YOUR WARRANTY AND IS AT YOUR OWN RISK.
+## Setup & Installation
 
-## Usage
+### Arch Linux
 
-For this project I created a simple Python program to both enable the controls and use them to control 2 virtual sound devices.
+On Arch, you can build & install via `yay`:   
+```sh
+sudo yay -S nova-chatmix
+```
 
-### Dependencies
+Once that is complete, run the following to enable the service and persist between boots:   
+```sh
+systemctl --user enable nova-chatmix --now
+```
+
+You then should see the Sonar icon on your base station and the `NovaChat` and `NovaGame` audio devices on your system.
+
+Set your chat applications _(like Discord)_ to output audio to `NovaChat` and your system audio to output to `NovaGame`. The volume of each can be controlled independently on the system level, and the mix can be controlled with your headset or base station.
+
+
+> [!NOTE]
+> If you do not see the Sonar icon or the Nova* audio devices, you might need to run `sudo udevadm control --reload-rules` and then the `systemctl` command mentioned above again.
+
+
+### Other Distros
+
+Installation on other Linux distros is more complicated at the moment. This will be made simpler in the future. Feel free to submit a PR for other distros.
+
+#### Prerequisites
+The following dependencies need to be installed prior to setting this project up:
 
 - Python 3
-- python-hidapi
+- python3-hidapi / python3-hid
 - PipeWire
 - pactl
 
 On Fedora these can be installed with:
 
-```
+```sh
 sudo dnf install pulseaudio-utils python3 python3-hidapi
 ```
 
 On Debian based systems (like Ubuntu or Pop!_OS) these can be installed with:
 
-```
+```sh
 sudo apt install pulseaudio-utils python3 python3-hid
 ```
 
-### Install
+#### Install
 
 Clone this repo and cd into it
 
-```
+```sh
 git clone https://git.dymstro.nl/Dymstro/nova-chatmix-linux.git
 cd nova-chatmix-linux
 ```
@@ -58,7 +81,7 @@ To be able to run the script as a non-root user, some udev rules need to be appl
 
 Copy `50-nova-pro-wireless.rules` to `/etc/udev/rules.d` and reload udev rules:
 
-```
+```sh
 sudo cp 50-nova-pro-wireless.rules /etc/udev/rules.d/
 
 sudo udevadm control --reload-rules
@@ -67,7 +90,7 @@ sudo udevadm trigger
 
 If you want to run this script on startup you can add and enable the systemd service
 
-```
+```sh
 ## The systemd service expects the script in .local/bin
 # Create the folder if it doesn't exist
 mkdir -p ~/.local/bin
@@ -84,26 +107,26 @@ systemctl --user daemon-reload
 systemctl --user enable nova-chatmix --now
 ```
 
-### Run
+#### One-Time Run
 
-You can now run the python script to use ChatMix.
+> [!IMPORTANT]
+> You do not need to run this if you installed the systemd unit!
+
+You can run the python script manually to use ChatMix.
 This will create 2 virtual sound devices:
 
 - NovaGame for game/general audio
 - NovaChat for chat audio
 
-```
-# You do not need to run this if you installed the systemd unit!
-python nova.py
-```
+`python nova.py`
 
 This command does not generate any output, but the Sonar icon should now be visible on the base station.
 
-To use ChatMix select NovaGame as your main audio output, and select NovaChat as the output in your voice chat software of choice.
+To use ChatMix, select `NovaGame` as your main audio output, and select `NovaChat` as the output in your voice chat software of choice.
 
 ChatMix should now work. You can toggle between volume and ChatMix by pressing the dial.
 
-## Details
+## Technical Details
 
 I started by installing SteelSeries GG and Sonar in a Windows 11 VM and passing through the base station USB device. On the Linux host I used Wireshark to see what happened when I enabled Sonar.
 
@@ -111,7 +134,7 @@ This device uses USB HID events to both configure and receive data from the base
 
 I am on MCU firmware version `01.29.27` and DSP firmware version `00.03.82`.
 
-### Protocol description
+### Protocol Description
 
 See `nova.py` for a commented example implementation.
 
