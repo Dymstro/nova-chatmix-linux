@@ -93,9 +93,9 @@ If you want to run this script on startup you can add and enable the systemd ser
 ```sh
 ## The systemd service expects the script in .local/bin
 # Create the folder if it doesn't exist
-mkdir -p ~/.local/bin
+mkdir -p /usr/bin/nova-chatmix
 # Copy the script to the expected location
-cp -i nova.py ~/.local/bin
+cp -i nova.py /usr/bin/nova-chatmix
 
 # Create systemd user unit folder if it doesn't exist
 mkdir -p ~/.config/systemd/user
