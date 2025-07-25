@@ -1,0 +1,13 @@
+pkgbase = nova-chatmix
+	pkgver = 0.0.1
+	pkgrel = 1
+	install = nova-chatmix.install
+	arch = x86_64
+	makedepends = git
+	depends = python
+	depends = python-hid
+	depends = pipewire
+	source = nova-chatmix::git+https://github.com/Dymstro/nova-chatmix-linux.git
+	sha256sums = SKIP
+
+pkgname = nova-chatmix
