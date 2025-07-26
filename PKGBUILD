@@ -2,9 +2,10 @@ pkgname=nova-chatmix
 pkgver=0.0.1
 pkgrel=1
 arch=('x86_64')
-depends=('python' 'python-hid' 'pipewire')
+depends=('python' 'python-hidapi' 'pipewire')
 makedepends=('git')
-source=("$pkgname::git+https://github.com/Dymstro/nova-chatmix-linux.git")
+# source=("$pkgname::git+https://github.com/Dymstro/nova-chatmix-linux.git")
+source=("$pkgname::git+https://github.com/jaxonwright/nova-chatmix-linux.git#branch=arch")
 sha256sums=('SKIP')
 install=nova-chatmix.install
 
