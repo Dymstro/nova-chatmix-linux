@@ -25,12 +25,16 @@ USING ANYTHING IN THIS PROJECT _MIGHT_ VOID YOUR WARRANTY AND IS AT YOUR OWN RIS
 
 ### Arch Linux
 
+#### Install
+
 On Arch, you can build & install via `yay`:   
 ```sh
 sudo yay -S nova-chatmix
 ```
 
-Once that is complete, run the following to enable the service and persist between boots:   
+#### Enable Service
+
+Once installed, run the following to enable the service and persist between boots:   
 ```sh
 systemctl --user enable nova-chatmix --now
 ```
@@ -43,6 +47,13 @@ Set your chat applications _(like Discord)_ to output audio to `NovaChat` and yo
 > [!NOTE]
 > If you do not see the Sonar icon or the Nova* audio devices, you might need to run `sudo udevadm control --reload-rules` and then the `systemctl` command mentioned above again.
 
+#### Uninstall
+
+If you wish to ever uninstall this package, run the following:   
+```sh
+sudo pacman -R nova-chatmix
+```
+
 
 ### Other Distros
 
@@ -52,7 +63,7 @@ Installation on other Linux distros is more complicated at the moment. This will
 The following dependencies need to be installed prior to setting this project up:
 
 - Python 3
-- python3-hidapi / python3-hid
+- python3-hidapi
 - PipeWire
 - pactl
 
