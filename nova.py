@@ -5,7 +5,7 @@
 from signal import SIGINT, SIGTERM, signal
 from subprocess import Popen, check_output
 
-from hid import Device
+from hid import device
 from hid import enumerate as hidenumerate
 
 CMD_PACTL = "pactl"
@@ -121,8 +121,9 @@ class NovaProWireless:
                 if self.PW_OUTPUT_SINK_AUTODETECT in sink_name:
                     output_sink = sink_name
 
-        self.dev = Device(path=devpath)
-        self.dev.nonblocking = True
+        self.dev = device()
+        self.dev.open_path(devpath)
+        self.dev.set_nonblocking(True)
         self.output_sink = output_sink
 
     # Enables/Disables chatmix controls
