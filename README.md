@@ -17,9 +17,7 @@ I wanted to be able to use ChatMix on linux, so I reverse engineered the communi
 ## Disclaimer
 
 THIS PROJECT HAS NO ASSOCIATION TO STEELSERIES, NOR IS IT IN ANY WAY SUPPORTED BY THEM.
-
 I AM NOT RESPONSIBLE FOR BRICKED/BROKEN DEVICES NOR DO I GUARANTEE IT WILL WORK FOR YOU.
-
 USING ANYTHING IN THIS PROJECT _MIGHT_ VOID YOUR WARRANTY AND IS AT YOUR OWN RISK.
 
 ## Usage
@@ -35,13 +33,13 @@ For this project I created a simple Python program to both enable the controls a
 
 On Fedora these can be installed with:
 
-```
+```bash
 sudo dnf install pulseaudio-utils python3 python3-hidapi
 ```
 
 On Debian based systems (like Ubuntu or Pop!_OS) these can be installed with:
 
-```
+```bash
 sudo apt install pulseaudio-utils python3 python3-hid
 ```
 
@@ -49,7 +47,7 @@ sudo apt install pulseaudio-utils python3 python3-hid
 
 Clone this repo and cd into it
 
-```
+```bash
 git clone https://git.dymstro.nl/Dymstro/nova-chatmix-linux.git
 cd nova-chatmix-linux
 ```
@@ -58,7 +56,7 @@ To be able to run the script as a non-root user, some udev rules need to be appl
 
 Copy `50-nova-pro.rules` to `/etc/udev/rules.d` and reload udev rules:
 
-```
+```bash
 sudo cp 50-nova-pro.rules /etc/udev/rules.d/
 
 sudo udevadm control --reload-rules
@@ -67,7 +65,7 @@ sudo udevadm trigger
 
 If you want to run this script on startup you can add and enable the systemd service
 
-```
+```bash
 ## The systemd service expects the script in .local/bin
 # Create the folder if it doesn't exist
 mkdir -p ~/.local/bin
@@ -92,7 +90,7 @@ This will create 2 virtual sound devices:
 - NovaGame for game/general audio
 - NovaChat for chat audio
 
-```
+```bash
 # You do not need to run this if you installed the systemd unit!
 python nova.py
 ```
