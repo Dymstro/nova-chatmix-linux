@@ -40,7 +40,7 @@ class ChatMix:
                 CMD_PWLOOPBACK,
                 "-P",
                 output_sink,
-                "--capture-props=media.class=Audio/Sink",
+                "--capture-props=media.class=Audio/Sink,audio.rate=44100,audio.channels=2",
                 "-n",
                 name,
             ]
