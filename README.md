@@ -1,4 +1,4 @@
-# Arctis Nova Pro Wireless ChatMix on Linux
+# Arctis Nova Pro ChatMix on Linux
 
 ## About this project
 
@@ -6,7 +6,7 @@ Some SteelSeries headsets have a feature called ChatMix where you can easily adj
 
 In previous SteelSeries headsets ChatMix was always a hardware feature. It worked by providing 2 sound devices to the host, 1 for general audio and the other for chat audio.
 
-In newer generations of their headsets however, in particular the Arctis Nova Pro Wireless, this feature was taken out of the hardware itself, and made into a feature of their audio software called Sonar.
+In newer generations of their headsets however, in particular the Arctis Nova Pro, this feature was taken out of the hardware itself, and made into a feature of their audio software called Sonar.
 
 Sonar of course only works on Windows and requires a SteelSeries account.
 
@@ -56,10 +56,10 @@ cd nova-chatmix-linux
 
 To be able to run the script as a non-root user, some udev rules need to be applied. This will allow regular users to access the base station USB device. It also starts the script when it gets plugged in (only when the systemd service is also set up).
 
-Copy `50-nova-pro-wireless.rules` to `/etc/udev/rules.d` and reload udev rules:
+Copy `50-nova-pro.rules` to `/etc/udev/rules.d` and reload udev rules:
 
 ```
-sudo cp 50-nova-pro-wireless.rules /etc/udev/rules.d/
+sudo cp 50-nova-pro.rules /etc/udev/rules.d/
 
 sudo udevadm control --reload-rules
 sudo udevadm trigger
