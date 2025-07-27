@@ -54,7 +54,7 @@ class NovaProWireless:
     # USB VendorID
     VID = 0x1038
     # USB PIDs for Acrtis Nova Pro Wireless & XBOX variant
-    PID_LIST = [0x12E0, 0x12E5]
+    PID_LIST = [0x12E0, 0x12E5, 0x12CB]
 
     # bInterfaceNumber
     INTERFACE = 0x4

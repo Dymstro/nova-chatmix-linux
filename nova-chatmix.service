@@ -1,5 +1,5 @@
 [Unit]
-Description=Enable ChatMix for the Steelseries Arctis Nova Pro Wireless
+Description=Enable ChatMix for the Steelseries Arctis Nova Pro
 After=pipewire.service pipewire-pulse.service
 Wants=network-online.target
 
