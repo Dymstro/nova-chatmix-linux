@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/nova.py
+ExecStart=%h/.local/bin/nova-chatmix
 Restart=on-failure
 
 [Install]

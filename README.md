@@ -59,7 +59,7 @@ To be able to run the script as a non-root user, some udev rules need to be appl
 Copy `50-nova-pro-wireless.rules` to `/etc/udev/rules.d` and reload udev rules:
 
 ```
-sudo cp 50-nova-pro-wireless.rules /etc/udev/rules.d/
+sudo cp 50-nova-pro-wireless.rules /etc/udev/rules.d/50-nova-pro-wireless.rules
 
 sudo udevadm control --reload-rules
 sudo udevadm trigger
@@ -72,12 +72,12 @@ If you want to run this script on startup you can add and enable the systemd ser
 # Create the folder if it doesn't exist
 mkdir -p ~/.local/bin
 # Copy the script to the expected location
-cp -i nova.py ~/.local/bin
+cp -i nova-chatmix.py ~/.local/bin/nova-chatmix
 
 # Create systemd user unit folder if it doesn't exist
 mkdir -p ~/.config/systemd/user
 # Install the service file
-cp nova-chatmix.service ~/.config/systemd/user/
+cp nova-chatmix.service ~/.config/systemd/user/nova-chatmix.service
 # Reload systemd configuration
 systemctl --user daemon-reload
 # Enable and start the service
@@ -94,7 +94,7 @@ This will create 2 virtual sound devices:
 
 ```
 # You do not need to run this if you installed the systemd unit!
-python nova.py
+python nova-chatmix.py
 ```
 
 This command does not generate any output, but the Sonar icon should now be visible on the base station.
@@ -113,7 +113,7 @@ I am on MCU firmware version `01.29.27` and DSP firmware version `00.03.82`.
 
 ### Protocol description
 
-See `nova.py` for a commented example implementation.
+See `nova-chatmix.py` for a commented example implementation.
 
 The controls and data output are on USB Interface 4 (`bInterfaceNumber=4`). This interface has 2 endpoint, 1 for sending data (`0x04`) and 1 for receiving data (`0x84`).
 
