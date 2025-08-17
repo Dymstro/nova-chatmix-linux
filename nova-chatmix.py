@@ -51,9 +51,10 @@ class ChatMix:
 
 
 class NovaProWireless:
-    # USB IDs
+    # USB VendorID
     VID = 0x1038
-    PID = 0x12E0
+    # USB PIDs for Acrtis Nova Pro Wireless & XBOX variant
+    PID_LIST = [0x12E0, 0x12E5]
 
     # bInterfaceNumber
     INTERFACE = 0x4
@@ -100,16 +101,18 @@ class NovaProWireless:
     # Device not found error string
     ERR_NOTFOUND = "Device not found"
 
+    @staticmethod
+    def ResolveHidDevPath():
+        for pid in NovaProWireless.PID_LIST:
+            for hiddev in hidenumerate(NovaProWireless.VID, pid):
+                if hiddev["interface_number"] == NovaProWireless.INTERFACE:
+                    return hiddev["path"]
+        raise DeviceNotFoundException
+
     # Selects correct device, and makes sure we can control it
     def __init__(self, output_sink=None):
         # Find HID device path
-        devpath = None
-        for hiddev in hidenumerate(self.VID, self.PID):
-            if hiddev["interface_number"] == self.INTERFACE:
-                devpath = hiddev["path"]
-                break
-        if not devpath:
-            raise DeviceNotFoundException
+        devpath = NovaProWireless.ResolveHidDevPath()
 
         # Try to automatically detect output sink, this is skipped if output_sink is given
         if not output_sink:
